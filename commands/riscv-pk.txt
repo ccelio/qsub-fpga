@@ -1,0 +1,1 @@
+riscv-pk # hello # touch *; touch */*; touch */*/*; cd build; ../configure --build=riscv64-unknown-linux; make
