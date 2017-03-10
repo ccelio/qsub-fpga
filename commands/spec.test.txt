@@ -1,0 +1,12 @@
+400.perlbench.test # spec-test/400.perlbench # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/400.perlbench.test.txt
+401.bzip2.test # spec-test/401.bzip2 # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/401.bzip2.test.txt
+403.gcc.test # spec-test/403.gcc # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/403.gcc.test.txt
+429.mcf.test # spec-test/429.mcf # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/429.mcf.test.txt
+445.gobmk.test # spec-test/445.gobmk # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/445.gobmk.test.txt
+456.hmmer.test # spec-test/456.hmmer # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/456.hmmer.test.txt
+458.sjeng.test # spec-test/458.sjeng # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/458.sjeng.test.txt
+462.libquantum.test # spec-test/462.libquantum # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/462.libquantum.test.txt
+464.h264ref.test # spec-test/464.h264ref # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/464.h264ref.test.txt
+471.omnetpp.test # spec-test/471.omnetpp # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/471.omnetpp.test.txt
+473.astar.test # spec-test/473.astar # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/473.astar.test.txt
+483.xalancbmk.test # spec-test/483.xalancbmk # FILE:/nscratch/biancolin/qsub-fpga-initramfs/commands/spec/483.xalancbmk.test.txt
