@@ -10,14 +10,15 @@ import optparse
 import subprocess
 import getpass
 import os
+import shutil
 from datetime import datetime
 
 #FPGA_BITSTREAM="rocketchip_wrapper_mig_hpmss.bit"
-DEFAULT_FPGA_BITSTREAM="bitfiles/midas_wrapper.bit"
-LINUX_SOURCE="/scratch/biancolin/initramfs_linux_flow"
-INITFS_SOURCE="/nscratch/biancolin/initram"
-BMARK_SOURCE="benchmarks"
-OUTPUT_DIR="output"
+DEFAULT_FPGA_BITSTREAM="/nscratch/midas/bitstream/midas_wrapper.bit"
+LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
+BMARK_SOURCE="/nscratch/midas/benchmarks"
+OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/output"
+DEFAULT_SIM_FLAGS="+mm_writeLatency=20 +mm_readLatency=20 +mm_writeMaxReqs=8 +mm_readMaxReqs=8"
 
 EMAIL_ENABLED=True
 
@@ -32,21 +33,23 @@ def main():
     parser.add_option('-o', '--outdir', dest='outdir', help='output directory')
     parser.add_option('-d', '--disable_counters', dest='disable_counters', default=False,
                       action="store_true", help='Does not run rv_counters in target machine.')
+    parser.add_option('-s', '--sim-flags', dest='sim_flags', default=False, help='simulation flags')
     (options, args) = parser.parse_args()
     if not options.filename:
         parser.error('Please give an input filename with -f')
     
     fpga_bitstream = options.bitstream if options.bitstream else DEFAULT_FPGA_BITSTREAM
+    sim_flags = options.sim_flags if options.sim_flags else DEFAULT_SIM_FLAGS
 
     f = open(options.filename)
-    count = 0
-
     now = datetime.now()
     global OUTPUT_DIR 
     if options.outdir:
         OUTPUT_DIR = options.outdir
     else:
-        OUTPUT_DIR = OUTPUT_DIR + "-" + "boom"
+        OUTPUT_DIR = OUTPUT_DIR + "-" + "midas"
+    if not os.path.exists(OUTPUT_DIR):
+      os.makedirs(OUTPUT_DIR)
     print OUTPUT_DIR
 
     # Each line in the command file represents a different ramdisk image and
@@ -64,20 +67,18 @@ def main():
                 cmd_str = ''.join(cmd_file.readlines())
 
         print "Benchmark  : ", bmk_str
-        p = subprocess.Popen("mkdir -p build", stdout=subprocess.PIPE, shell=True)
-        qfile = 'build/qcmd_' + bmk_str + ".sh"
-        initfile = 'build/init_profile_' + bmk_str
+        build_dir = os.path.join('/nscratch', 'midas', 'build')
+        if not os.path.exists(build_dir):
+          os.makedirs(build_dir)
+        qfile = os.path.join(build_dir, 'qcmd_' + bmk_str + ".sh")
+        initfile = os.path.join(build_dir, 'init_profile_' + bmk_str)
         print cmd_str
         generate_init_file(cmd_str, dir_str, initfile, options.disable_counters)
-        generate_bblvmlinux(bmk_str, dir_str, initfile)
-        linux = 'build/bblvmlinux-' + bmk_str
-        generate_qsub_file(bmk_str, cmd_str, qfile, OUTPUT_DIR, linux, fpga_bitstream)
+        linux = generate_bblvmlinux(bmk_str, dir_str, initfile)
+        generate_qsub_file(bmk_str, cmd_str, qfile, OUTPUT_DIR, linux, fpga_bitstream, sim_flags)
         # now we can qsub on the file we just created
-        p = subprocess.Popen("qsub " + qfile, stdout=subprocess.PIPE, shell=True)
-        (output, err) = p.communicate()
-        print output
-        count += 1
-
+        print "run:", "qsub", qfile
+        subprocess.check_call(["qsub", qfile])
 
 #---------------------
 def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
@@ -119,15 +120,14 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
 
         f.write("ls -ls /bin\n")
         f.write("ls -ls /usr/bin\n")
-        f.write("cd /celio/" + os.path.basename(dir_str) + "\n")
+        f.write("cd /celio/\n")
         f.write("ls\n")
-#        f.write("/celio/rv_counters_hpm -c &\n")
         if not disable_counters:
-            f.write("/celio/rv_counters_hpm &\n")
+          f.write("./rv_counters &\n")
         f.write("sleep 1\n")
-        f.write(cmd_str)
-        f.write("killall rv_counters_hpm\n")
-        f.write("while pgrep rv_counters_hpm > /dev/null; do sleep 1; done\n")
+        f.write(cmd_str + "\n")
+        f.write("killall rv_counters\n")
+        f.write("while pgrep rv_counters > /dev/null; do sleep 1; done\n")
         f.write("sync\n")
         f.write("poweroff -f\n")
 
@@ -135,23 +135,19 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
 #---------------------
 def generate_bblvmlinux(bmk_str, dir_str, initfile):
     print "Generating bblvmlinux with: ", initfile
-    target = INITFS_SOURCE + "/" + os.path.basename(dir_str)
-    cmds =""
-    cmds += "\n"
-    cmds += "cp " + initfile + " " + LINUX_SOURCE + "/profile\n"
-    cmds += "cp -rf " + BMARK_SOURCE + "/" + dir_str + " " + target + "\n"
-    cmds += "cd " + LINUX_SOURCE + "; ./build-initram.py\n"
-    cmds += "cd " + LINUX_SOURCE + "; make\n"
-    cmds += "cp " + LINUX_SOURCE + "/bblvmlinux /nscratch/" + getpass.getuser() + "/qsub-fpga-initramfs/build/bblvmlinux-" + bmk_str + "\n"
-    cmds += "rm -r " + target + "\n"
-    print cmds
-    p = subprocess.Popen(cmds, stdout=subprocess.PIPE, shell=True)
-    (output, err) = p.communicate()
-    print output, err
+    shutil.copyfile(initfile, os.path.join(LINUX_SOURCE, "profile"))
+    subprocess.check_call("make", cwd=LINUX_SOURCE, shell=True)
+    target_dir = os.path.join("/nscratch", "midas", "qsub-fpga-initramfs", "build")
+    if not os.path.exists(target_dir):
+      os.makedirs(target_dir)
+    linux = os.path.join(target_dir, "bblvmlinux-" + bmk_str)
+    shutil.copyfile(os.path.join(LINUX_SOURCE, "bblvmlinux"), linux)
+    shutil.copymode(os.path.join(LINUX_SOURCE, "bblvmlinux"), linux)
 
+    return linux
 
 #---------------------
-def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstream):
+def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstream, sim_flags):
     with open(qfile, 'w') as f:
         # I can't get this to work with sh for some reason
         f.write("#!/bin/bash\n")
@@ -178,8 +174,7 @@ def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstrea
         f.write("#PBS -e localhost:/dev/null\n")
         f.write("#PBS -o localhost:/dev/null\n")
         print "Current directory(",os.getcwd(),")"
-        #f.write("QSUBDIR=" + os.getcwd() + "/" + output_dir + "\n")
-        f.write("QSUBDIR=/nscratch/$USER/qsub-fpga-initramfs/" + output_dir + "/\n")
+        f.write("QSUBDIR=" + output_dir + "/\n")
         f.write("JOBID=`echo $PBS_JOBID | sed -e 's/\..*//'`\n")
         f.write("mkdir -p $QSUBDIR\n")
         f.write("exec > $QSUBDIR/" + bmk_str + ".out 2> $QSUBDIR/" + bmk_str +".err\n\n")
@@ -210,20 +205,24 @@ def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstrea
         f.write("source /ecad/tools/xilinx/Vivado/2016.2/settings64.sh\n")
         f.write("which vivado\n")
         f.write("sleep 1\n")
-        f.write("/nscratch/fpga-cluster/fpga-scripts/load-bitstream.sh /nscratch/$USER/qsub-fpga-initramfs/" + fpga_bitstream + "\n")
+        f.write("/nscratch/fpga-cluster/fpga-scripts/load-bitstream.sh " + fpga_bitstream + "\n")
         f.write("sleep 2\n")
         
+        f.write("### Copy the MIDAS driver\n")
+        key = os.path.join("/nscratch", "midas", "ssh", "id_rsa")
+        f.write("scp -i " + key + " /nscratch/midas/driver/MidasTop-zynq root@$FPGA_IP:/sdcard/midas/MidasTop-zynq\n")
+        f.write("scp -i " + key + " /nscratch/midas/driver/libfesvr.so root@$FPGA_IP:/usr/local/lib/libfesvr.so\n")
+
         f.write("### Send over the image we want to the FPGA\n")
-        f.write("scp -i ~/.ssh/id_rsa /nscratch/$USER/qsub-fpga-initramfs/" + linux + " root@$FPGA_IP:/sdcard/$USER/linux\n")
-        f.write("scp -i ~/.ssh/id_rsa /nscratch/$USER/qsub-fpga-initramfs/libfesvr.so root@$FPGA_IP:/sdcard/$USER/libfesvr.so\n")
-        f.write("scp -i ~/.ssh/id_rsa /nscratch/$USER/qsub-fpga-initramfs/fesvr-zynq root@$FPGA_IP:/sdcard/$USER/fesvr-zynq\n")
-        f.write("scp -i ~/.ssh/id_rsa /nscratch/$USER/qsub-fpga-initramfs/pk root@$FPGA_IP:/sdcard/$USER/pk\n")
+        f.write("scp -i " + key + " " + linux + " root@$FPGA_IP:/sdcard/midas/linux\n")
+        f.write("scp -i " + key + " /nscratch/midas/benchmarks/pk root@$FPGA_IP:/sdcard/midas/pk\n")
         f.write("sleep 2\n")
 
         f.write("### Log-in to the FPGA and run the benchmark\n")
         f.write("echo ['" + cmd_str.replace('\n','') + "']\n")
-        f.write("time ssh root@$FPGA_IP -i ./ssh/id_rsa -t \"ls; sync; uname -a; ls /sdcard/$USER; cp /sdcard/$USER/libfesvr.so /usr/local/lib/libfesvr.so; /sdcard/$USER/fesvr-zynq /sdcard/$USER/pk ~/hello; /sdcard/$USER/fesvr-zynq /sdcard/$USER/linux\"\n")
-
+        f.write("time ssh root@$FPGA_IP -i " + key + 
+          " -t \"ls; sync; uname -a; ls /sdcard/midas; cd /sdcard/midas; ./MidasTop-zynq " +
+          sim_flags + " ./linux\"\n")
          
 
 if __name__ == '__main__':
