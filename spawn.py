@@ -120,10 +120,10 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
 
         f.write("ls -ls /bin\n")
         f.write("ls -ls /usr/bin\n")
-        f.write("cd /celio/\n")
+        f.write("cd /celio\n")
         f.write("ls\n")
         if not disable_counters:
-          f.write("./rv_counters &\n")
+          f.write("/celio/rv_counters/rv_counters &\n")
         f.write("sleep 1\n")
         f.write(cmd_str + "\n")
         f.write("killall rv_counters\n")
@@ -136,7 +136,8 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
 def generate_bblvmlinux(bmk_str, dir_str, initfile):
     print "Generating bblvmlinux with: ", initfile
     shutil.copyfile(initfile, os.path.join(LINUX_SOURCE, "profile"))
-    subprocess.check_call("make", cwd=LINUX_SOURCE, shell=True)
+    subprocess.check_call(["./build-initram.py", "--dir", "/nscratch/midas/initram/" + dir_str], cwd=LINUX_SOURCE)
+    subprocess.check_call(["make", "DIRNAME=" + dir_str], cwd=LINUX_SOURCE, shell=True)
     target_dir = os.path.join("/nscratch", "midas", "qsub-fpga-initramfs", "build")
     if not os.path.exists(target_dir):
       os.makedirs(target_dir)
