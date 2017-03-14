@@ -17,8 +17,8 @@ from datetime import datetime
 DEFAULT_FPGA_BITSTREAM="/nscratch/midas/bitstream/midas_wrapper.bit"
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
 BMARK_SOURCE="/nscratch/midas/benchmarks"
-OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/output"
-DEFAULT_SIM_FLAGS="+mm_writeLatency=20 +mm_readLatency=20 +mm_writeMaxReqs=8 +mm_readMaxReqs=8"
+OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/first-mem-profile"
+DEFAULT_SIM_FLAGS="+mm_writeLatency=30 +mm_readLatency=30 +mm_writeMaxReqs=8 +mm_readMaxReqs=8"
 
 EMAIL_ENABLED=True
 
@@ -143,7 +143,6 @@ def generate_bblvmlinux(bmk_str, dir_str, initfile):
       os.makedirs(target_dir)
     linux = os.path.join(target_dir, "bblvmlinux-" + bmk_str)
     shutil.copyfile(os.path.join(LINUX_SOURCE, "bblvmlinux"), linux)
-    shutil.copymode(os.path.join(LINUX_SOURCE, "bblvmlinux"), linux)
 
     return linux
 
@@ -224,7 +223,7 @@ def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstrea
         f.write("time ssh root@$FPGA_IP -i " + key + 
           " -t \"ls; sync; uname -a; ls /sdcard/midas; cd /sdcard/midas; ./MidasTop-zynq " +
           sim_flags + " ./linux\"\n")
-         
+        f.write("scp -i " + key + " root@$FPGA_IP:/sdcard/midas/memory_stats.csv $QSUBDIR/" + bmk_str + "_memory_stats.csv\n")
 
 if __name__ == '__main__':
     main()
