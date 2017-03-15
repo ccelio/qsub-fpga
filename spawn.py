@@ -16,7 +16,6 @@ from datetime import datetime
 #FPGA_BITSTREAM="rocketchip_wrapper_mig_hpmss.bit"
 DEFAULT_FPGA_BITSTREAM="/nscratch/midas/bitstream/midas_wrapper.bit"
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-BMARK_SOURCE="/nscratch/midas/benchmarks"
 OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/first-mem-profile"
 DEFAULT_SIM_FLAGS="+mm_writeLatency=30 +mm_readLatency=30 +mm_writeMaxReqs=8 +mm_readMaxReqs=8"
 
@@ -209,7 +208,7 @@ def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstrea
         f.write("sleep 2\n")
         
         f.write("### Copy the MIDAS driver\n")
-        key = os.path.join("/nscratch", "midas", "ssh", "id_rsa")
+        key = os.path.join("~", ".ssh", "id_rsa")
         f.write("scp -i " + key + " /nscratch/midas/driver/MidasTop-zynq root@$FPGA_IP:/sdcard/midas/MidasTop-zynq\n")
         f.write("scp -i " + key + " /nscratch/midas/driver/libfesvr.so root@$FPGA_IP:/usr/local/lib/libfesvr.so\n")
 
