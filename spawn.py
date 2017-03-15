@@ -214,7 +214,6 @@ def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstrea
 
         f.write("### Send over the image we want to the FPGA\n")
         f.write("scp -i " + key + " " + linux + " root@$FPGA_IP:/sdcard/midas/linux\n")
-        f.write("scp -i " + key + " /nscratch/midas/benchmarks/pk root@$FPGA_IP:/sdcard/midas/pk\n")
         f.write("sleep 2\n")
 
         f.write("### Log-in to the FPGA and run the benchmark\n")
