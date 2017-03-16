@@ -63,7 +63,11 @@ def main():
         # a file path can be given inplace of a single shell command
         if (cmd_str.startswith("FILE:")):
             with open(cmd_str[5:], 'r') as cmd_file:
-                cmd_str = ''.join(cmd_file.readlines())
+              cmd_str = ''
+              for line in cmd_file:
+                cmd_str += line.strip() + " >> _run.dump 2>&1\n"
+        else:
+          cmd_str = cmd_str.strip() + " >> _run.dump 2>&1\n"
 
         print "Benchmark  : ", bmk_str
         build_dir = os.path.join('/nscratch', 'midas', 'build')
@@ -83,9 +87,9 @@ def main():
 def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
     print "Opening initfile: ", initfile
     with open(initfile, 'w') as f:
-        f.write("echo \"\"\n")
-        f.write("uname -a\n")
-        f.write("echo \"\"\n")
+        # f.write("echo \"\"\n")
+        # f.write("uname -a\n")
+        # f.write("echo \"\"\n")
         if ENABLE_PYTHON:
             f.write("export PATH=$PATH:/usr/libexec/gcc/riscv64-poky-linux/6.1.1\n")
             f.write("export PYTHONHOME=/usr\n")
@@ -115,12 +119,10 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
             f.write("ln -s python2 python\n")
             f.write("ln -s python2.7-config python2-config\n")
             f.write("ln -s python2-config python-config\n")
-        f.write("cd ~\n")
-
-        f.write("ls -ls /bin\n")
-        f.write("ls -ls /usr/bin\n")
+        # f.write("ls -ls /bin\n")
+        # f.write("ls -ls /usr/bin\n")
         f.write("cd /celio\n")
-        f.write("ls\n")
+        # f.write("ls\n")
         if not disable_counters:
           f.write("/celio/rv_counters/rv_counters &\n")
         f.write("sleep 1\n")
@@ -128,6 +130,7 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
         f.write("killall rv_counters\n")
         f.write("while pgrep rv_counters > /dev/null; do sleep 1; done\n")
         f.write("sync\n")
+        f.write("cat _run.dump\n")
         f.write("poweroff -f\n")
 
 
