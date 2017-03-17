@@ -1,7 +1,7 @@
 #!/bin/bash
 #set -e
-INPUT_TYPE=test
-#INPUT_TYPE=ref
+#INPUT_TYPE=test
+INPUT_TYPE=ref
 COMMAND_DIR=/nscratch/midas/initram/riscv-spec-${INPUT_TYPE}/commands
 OUTPUT_SUBDIR=/nscratch/midas/spec
 
@@ -34,7 +34,7 @@ for b in ${BENCHMARKS[@]}; do
   fi
 
   # Write the benchmark to the qsub command file
-  echo "${b}.${INPUT_TYPE} # spec-${INPUT_TYPE}/${b} # FILE:${PROFILE_FILE}" >> $QSUB_COMMAND_FILE
+  echo "${b}.${INPUT_TYPE} # riscv-spec-${INPUT_TYPE}/${b} # FILE:${PROFILE_FILE}" >> $QSUB_COMMAND_FILE
 
   echo "Generating ${PROFILE_FILE}"
   for input in "${commands[@]}"; do
