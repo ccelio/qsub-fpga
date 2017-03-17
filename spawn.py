@@ -16,8 +16,13 @@ from datetime import datetime
 #FPGA_BITSTREAM="rocketchip_wrapper_mig_hpmss.bit"
 DEFAULT_FPGA_BITSTREAM="/nscratch/midas/bitstream/midas_wrapper.bit"
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/first-mem-profile"
-DEFAULT_SIM_FLAGS="+mm_writeLatency=30 +mm_readLatency=30 +mm_writeMaxReqs=8 +mm_readMaxReqs=8"
+SUFFIX="ref"
+LATENCY=1
+BANDWIDTH=8
+BUILD_DIR="/nscratch/midas/qsub-fpga-initramfs/script-%s-%d-%d" % (SUFFIX, LATENCY, BANDWIDTH)
+OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/output-%s-%d-%d" % (SUFFIX, LATENCY, BANDWIDTH)
+DEFAULT_SIM_FLAGS="+mm_writeLatency=%d +mm_readLatency=%d +mm_writeMaxReqs=%d +mm_readMaxReqs=%d" % (
+  LATENCY, LATENCY, BANDWIDTH, BANDWIDTH)
 
 EMAIL_ENABLED=True
 
@@ -29,7 +34,10 @@ def main():
     parser = optparse.OptionParser()
     parser.add_option('-f', '--file', dest='filename', help='input command file')
     parser.add_option('-b', '--bitstream', dest='bitstream', help='input bitstream file')
-    parser.add_option('-o', '--outdir', dest='outdir', help='output directory')
+    parser.add_option('-c', '--compile', dest='compile', default=False,
+                      action="store_true", help='compile linux')
+    parser.add_option('-r', '--run', dest='run', default=False,
+                      action="store_true", help='compile linux')
     parser.add_option('-d', '--disable_counters', dest='disable_counters', default=False,
                       action="store_true", help='Does not run rv_counters in target machine.')
     parser.add_option('-s', '--sim-flags', dest='sim_flags', default=False, help='simulation flags')
@@ -41,12 +49,6 @@ def main():
     sim_flags = options.sim_flags if options.sim_flags else DEFAULT_SIM_FLAGS
 
     f = open(options.filename)
-    now = datetime.now()
-    global OUTPUT_DIR 
-    if options.outdir:
-        OUTPUT_DIR = options.outdir
-    else:
-        OUTPUT_DIR = OUTPUT_DIR + "-" + "midas"
     if not os.path.exists(OUTPUT_DIR):
       os.makedirs(OUTPUT_DIR)
     print OUTPUT_DIR
@@ -70,18 +72,20 @@ def main():
           cmd_str = cmd_str.strip() + " >> _run.dump 2>&1\n"
 
         print "Benchmark  : ", bmk_str
-        build_dir = os.path.join('/nscratch', 'midas', 'build')
-        if not os.path.exists(build_dir):
-          os.makedirs(build_dir)
-        qfile = os.path.join(build_dir, 'qcmd_' + bmk_str + ".sh")
-        initfile = os.path.join(build_dir, 'init_profile_' + bmk_str)
+        if not os.path.exists(BUILD_DIR):
+          os.makedirs(BUILD_DIR)
+        qfile = os.path.join(BUILD_DIR, 'qcmd_' + bmk_str + ".sh")
+        initfile = os.path.join(BUILD_DIR, 'init_profile_' + bmk_str)
         print cmd_str
-        generate_init_file(cmd_str, dir_str, initfile, options.disable_counters)
-        linux = generate_bblvmlinux(bmk_str, dir_str, initfile)
-        generate_qsub_file(bmk_str, cmd_str, qfile, OUTPUT_DIR, linux, fpga_bitstream, sim_flags)
-        # now we can qsub on the file we just created
-        print "run:", "qsub", qfile
-        subprocess.check_call(["qsub", qfile])
+        if options.compile:
+          generate_init_file(cmd_str, dir_str, initfile, options.disable_counters)
+          generate_bblvmlinux(bmk_str, dir_str, initfile)
+        if options.run:
+          linux = os.path.join("/nscratch", "midas", "qsub-fpga-initramfs", "build", "bblvmlinux-" + bmk_str)
+          generate_qsub_file(bmk_str, cmd_str, qfile, OUTPUT_DIR, linux, fpga_bitstream, sim_flags)
+          # now we can qsub on the file we just created
+          print "run:", "qsub", qfile
+          subprocess.check_call(["qsub", qfile])
 
 #---------------------
 def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
@@ -124,7 +128,7 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
         f.write("cd /celio\n")
         # f.write("ls\n")
         if not disable_counters:
-          f.write("/celio/rv_counters/rv_counters &\n")
+          f.write("/celio/rv_counters/rv_counters >> _run.dump &\n")
         f.write("sleep 1\n")
         f.write(cmd_str + "\n")
         f.write("killall rv_counters\n")
