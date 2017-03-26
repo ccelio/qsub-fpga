@@ -13,16 +13,32 @@ import os
 import shutil
 from datetime import datetime
 
-#FPGA_BITSTREAM="rocketchip_wrapper_mig_hpmss.bit"
 DEFAULT_FPGA_BITSTREAM="/nscratch/midas/bitstream/midas_wrapper.bit"
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-SUFFIX="ref"
+SUFFIX="MAS"
+OPTION="close"
 LATENCY=1
+PENALTY=5
 BANDWIDTH=8
-BUILD_DIR="/nscratch/midas/qsub-fpga-initramfs/script-%s-%d-%d" % (SUFFIX, LATENCY, BANDWIDTH)
-OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/output-%s-%d-%d" % (SUFFIX, LATENCY, BANDWIDTH)
-DEFAULT_SIM_FLAGS="+mm_writeLatency=%d +mm_readLatency=%d +mm_writeMaxReqs=%d +mm_readMaxReqs=%d" % (
-  LATENCY, LATENCY, BANDWIDTH, BANDWIDTH)
+BUILD_DIR="/nscratch/midas/qsub-fpga-initramfs/script-%s-%s" % (SUFFIX, OPTION)
+OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/output-%s-%s" % (SUFFIX, OPTION)
+#BUILD_DIR="/nscratch/midas/qsub-fpga-initramfs/script-%s-%d-%d-%d" % (SUFFIX, LATENCY, PENALTY, BANDWIDTH)
+#OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/output-%s-%d-%d-%d" % (SUFFIX, LATENCY, PENALTY, BANDWIDTH)
+#BUILD_DIR="/nscratch/midas/qsub-fpga-initramfs/script-%d-%d" % (LATENCY, BANDWIDTH)
+#OUTPUT_DIR="/nscratch/midas/qsub-fpga-initramfs/output-%d-%d" % (LATENCY, BANDWIDTH)
+#DEFAULT_SIM_FLAGS="+mm_LATENCY=%d" % (LATENCY)
+#DEFAULT_SIM_FLAGS="+mm_writeLatency=%d +mm_readLatency=%d +mm_writeMaxReqs=%d +mm_readMaxReqs=%d" % (LATENCY, LATENCY, BANDWIDTH, BANDWIDTH)
+#DEFAULT_SIM_FLAGS="+mm_latency=%d +mm_bankAddrOffset=6 +mm_bankMask=7 +mm_conflictPenalty=%d +mm_writeMaxReqs=%d +mm_readMaxReqs=%d" % (LATENCY, PENALTY, BANDWIDTH, BANDWIDTH)
+DEFAULT_SIM_FLAGS="""+mm_readMaxReqs=%d \
+                +mm_writeMaxReqs=%d \
+                +mm_bankAddr_offset=6 \
+                +mm_bankAddr_mask=7 \
+                +mm_rowAddr_offset=16 \
+                +mm_rowAddr_mask=32767 \
+                +mm_tRP=7 \
+                +mm_tRCD=7 \
+                +mm_tCAS=7 \
+                +mm_openPagePolicy=%d""" % (BANDWIDTH, BANDWIDTH, 1 if OPTION == "open" else 0)
 
 EMAIL_ENABLED=True
 
@@ -129,11 +145,12 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
         # f.write("ls\n")
         if not disable_counters:
           f.write("/celio/rv_counters/rv_counters >> _run.dump &\n")
-        f.write("sleep 1\n")
+          f.write("sleep 1\n")
         f.write(cmd_str + "\n")
-        f.write("killall rv_counters\n")
-        f.write("while pgrep rv_counters > /dev/null; do sleep 1; done\n")
-        f.write("sync\n")
+        if not disable_counters:
+          f.write("killall rv_counters\n")
+          f.write("while pgrep rv_counters > /dev/null; do sleep 1; done\n")
+          f.write("sync\n")
         f.write("cat _run.dump\n")
         f.write("poweroff -f\n")
 
@@ -173,8 +190,8 @@ def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstrea
         
 #        f.write("### -l walltime=HH:MM:SS and -l cput=HH:MM:SS\n")
         f.write("### Jobs on the public clusters are currently limited to 10 days walltime.\n")
-        f.write("#PBS -l walltime=72:00:00\n")
-        f.write("#PBS -l cput=96:00:00\n")
+        f.write("#PBS -l walltime=120:00:00\n")
+        f.write("#PBS -l cput=120:00:00\n")
 
         f.write("### redirect stdout/stderr below with exec\n")
         f.write("#PBS -e localhost:/dev/null\n")
@@ -227,7 +244,7 @@ def generate_qsub_file(bmk_str, cmd_str, qfile, output_dir, linux, fpga_bitstrea
         f.write("echo ['" + cmd_str.replace('\n','') + "']\n")
         f.write("time ssh root@$FPGA_IP -i " + key + 
           " -t \"ls; sync; uname -a; ls /sdcard/midas; cd /sdcard/midas; ./MidasTop-zynq " +
-          sim_flags + " ./linux\"\n")
+          ' '.join(sim_flags.split()) + " ./linux\"\n")
         f.write("scp -i " + key + " root@$FPGA_IP:/sdcard/midas/memory_stats.csv $QSUBDIR/" + bmk_str + "_memory_stats.csv\n")
 
 if __name__ == '__main__':
