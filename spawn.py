@@ -63,12 +63,8 @@ def main():
         # For come complicated benchmarks consisting of multiple shell commands
         # a file path can be given inplace of a single shell command
         if (cmd_str.startswith("FILE:")):
-            with open(cmd_str[5:], 'r') as cmd_file:
-              cmd_str = ''
-              for line in cmd_file:
-                cmd_str += line.strip() + " >> _run.dump 2>&1\n"
-        else:
-          cmd_str = cmd_str.strip() + " >> _run.dump 2>&1\n"
+          with open(cmd_str[5:], 'r') as cmd_file:
+            cmd_str = ''.join(cmd_file.readlines())
 
         print "Benchmark  : ", bmk_str
         if not os.path.exists(BUILD_DIR):
@@ -127,14 +123,13 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
         f.write("cd /celio\n")
         # f.write("ls\n")
         if not disable_counters:
-          f.write("/celio/rv_counters/rv_counters >> _run.dump &\n")
+          f.write("/celio/rv_counters/rv_counters &\n")
           f.write("sleep 1\n")
         f.write(cmd_str + "\n")
         if not disable_counters:
           f.write("killall rv_counters\n")
           f.write("while pgrep rv_counters > /dev/null; do sleep 1; done\n")
           f.write("sync\n")
-        f.write("cat _run.dump\n")
         f.write("poweroff -f\n")
 
 
