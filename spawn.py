@@ -121,7 +121,7 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
         # f.write("ls -ls /bin\n")
         # f.write("ls -ls /usr/bin\n")
         f.write("cd /celio\n")
-        # f.write("ls\n")
+        f.write("ls\n")
         if not disable_counters:
           f.write("/celio/rv_counters/rv_counters &\n")
           f.write("sleep 1\n")
