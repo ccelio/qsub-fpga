@@ -35,6 +35,8 @@ def main():
     parser.add_option('-b', '--bitstream', dest='bitstream', help='input bitstream file')
     parser.add_option('-c', '--compile', dest='compile', default=False,
                       action="store_true", help='compile linux')
+    parser.add_option('-j', '--java', dest='java', default=False,
+                      action="store_true", help='compile java.')
     parser.add_option('-r', '--run', dest='run', default=False,
                       action="store_true", help='compile linux')
     parser.add_option('-d', '--disable_counters', dest='disable_counters', default=False,
@@ -73,17 +75,17 @@ def main():
         initfile = os.path.join(BUILD_DIR, 'init_profile_' + bmk_str)
         print cmd_str
         if options.compile:
-          generate_init_file(cmd_str, dir_str, initfile, options.disable_counters)
-          generate_bblvmlinux(bmk_str, dir_str, initfile)
+          generate_init_file(cmd_str, initfile, options.java, options.disable_counters)
+          generate_bblvmlinux(bmk_str, dir_str, initfile, options.java)
         if options.run:
-          linux = os.path.join("/nscratch", "midas", "qsub-fpga-initramfs", "build", "bblvmlinux-" + bmk_str)
+          linux = os.path.join("/nscratch", "midas", "build", "bblvmlinux-" + bmk_str)
           generate_qsub_file(bmk_str, cmd_str, sfile, OUTPUT_DIR, linux, fpga_bitstream, sim_flags)
           # now we can qsub on the file we just created
           print "run:", "sbatch", sfile
           subprocess.check_call(["sbatch", sfile])
 
 #---------------------
-def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
+def generate_init_file(cmd_str, initfile, java, disable_counters):
     print "Opening initfile: ", initfile
     with open(initfile, 'w') as f:
         # f.write("echo \"\"\n")
@@ -120,9 +122,13 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
             f.write("ln -s python2-config python-config\n")
         # f.write("ls -ls /bin\n")
         # f.write("ls -ls /usr/bin\n")
-        f.write("cd /celio\n")
+        if not java:
+          f.write("cd /celio\n")
+        else:
+          f.write("cd /JikesRVM\n")
         f.write("ls\n")
-        f.write("echo " + cmd_str + "\n")
+        for cmd in cmd_str.split("\n"):
+          f.write("echo " + cmd + "\n")
         if not disable_counters:
           f.write("/celio/rv_counters/rv_counters &\n")
           f.write("sleep 1\n")
@@ -135,12 +141,18 @@ def generate_init_file(cmd_str, dir_str, initfile, disable_counters):
 
 
 #---------------------
-def generate_bblvmlinux(bmk_str, dir_str, initfile):
+def generate_bblvmlinux(bmk_str, dir_str, initfile, java):
     print "Generating bblvmlinux with: ", initfile
     shutil.copyfile(initfile, os.path.join(LINUX_SOURCE, "profile"))
-    subprocess.check_call(["./build-initram.py", "--dir", "/nscratch/midas/initram/" + dir_str], cwd=LINUX_SOURCE)
-    subprocess.check_call(["make", "DIRNAME=" + dir_str], cwd=LINUX_SOURCE, shell=True)
-    target_dir = os.path.join("/nscratch", "midas", "qsub-fpga-initramfs", "build")
+    shutil.copyfile(os.path.join(LINUX_SOURCE, "busybox_config_%s" % ("java" if java else "spec")),
+                    os.path.join(LINUX_SOURCE, "busybox_config"))
+    subprocess.check_call(
+      ["./build-initram.py", "--dir", "/nscratch/midas/initram/" + dir_str] + (
+      ["--bmark", "java"] if java else []), cwd=LINUX_SOURCE)
+    subprocess.check_call(
+      ["make", "DIRNAME=" + dir_str] + (
+      ["BUILD_JAVA=1"] if java else []), cwd=LINUX_SOURCE, shell=True)
+    target_dir = os.path.join("/nscratch", "midas", "build")
     if not os.path.exists(target_dir):
       os.makedirs(target_dir)
     linux = os.path.join(target_dir, "bblvmlinux-" + bmk_str)
