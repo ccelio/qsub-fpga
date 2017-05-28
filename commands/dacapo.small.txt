@@ -1,0 +1,6 @@
+avrora.small # dacapo/avrora # FILE:/nscratch/midas/profile/dacapo/avrora.small.txt
+luindex.small # dacapo/luindex # FILE:/nscratch/midas/profile/dacapo/luindex.small.txt
+lusearch.small # dacapo/lusearch # FILE:/nscratch/midas/profile/dacapo/lusearch.small.txt
+pmd.small # dacapo/pmd # FILE:/nscratch/midas/profile/dacapo/pmd.small.txt
+sunflow.small # dacapo/sunflow # FILE:/nscratch/midas/profile/dacapo/sunflow.small.txt
+xalan.small # dacapo/xalan # FILE:/nscratch/midas/profile/dacapo/xalan.small.txt

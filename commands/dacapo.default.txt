@@ -1,0 +1,6 @@
+avrora.default # dacapo/avrora # FILE:/nscratch/midas/profile/dacapo/avrora.default.txt
+luindex.default # dacapo/luindex # FILE:/nscratch/midas/profile/dacapo/luindex.default.txt
+lusearch.default # dacapo/lusearch # FILE:/nscratch/midas/profile/dacapo/lusearch.default.txt
+pmd.default # dacapo/pmd # FILE:/nscratch/midas/profile/dacapo/pmd.default.txt
+sunflow.default # dacapo/sunflow # FILE:/nscratch/midas/profile/dacapo/sunflow.default.txt
+xalan.default # dacapo/xalan # FILE:/nscratch/midas/profile/dacapo/xalan.default.txt
