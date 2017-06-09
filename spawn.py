@@ -14,31 +14,47 @@ import shutil
 from datetime import datetime
 
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-TARGET="rocket"
-#TARGET="boom-2w"
+TARGET="rocket-l2"
+#TARGET="rocket-l2-80btbs"
+#TARGET="rocket-l2-160btbs"
+#TARGET="rocket-l2-320btbs"
+#TARGET="rocket-l2-480btbs"
+#TARGET="boom-2w-l2"
+#TARGET="boom-2w-tage-l2"
+#TARGET="boom-2w-gshare-l2-80btbs"
+#TARGET="boom-2w-gshare-l2-320btbs"
+#TARGET="boom-2w-gshare-l2-480btbs"
 BASE_DIR=os.path.join("/nscratch", getpass.getuser(), "boom-thesis", TARGET)
 BUILD_DIR=os.path.join(BASE_DIR, "script")
 OUTPUT_DIR=os.path.join(BASE_DIR, "output")
-DEFAULT_FPGA_BITSTREAM=os.path.join(BASE_DIR, "midas_wrapper.bit")
-LATENCY=1
-DEFAULT_SIM_FLAGS="+mm_LATENCY=%d" % (LATENCY)
+FPGA_BITSTREAM=os.path.join(BASE_DIR, "midas_wrapper.bit")
+L2_LATENCY=1
+MEM_LATENCY=80
+DEFAULT_SIM_FLAGS="\
++mm_MEM_LATENCY=%d \
++mm_L2_LATENCY=%d \
++mm_L2_WAY_BITS=2 \
++mm_L2_SET_BITS=12 \
++mm_L2_BLOCK_BITS=6" % (MEM_LATENCY, L2_LATENCY)
 
 EMAIL_ENABLED=True
 
 ENABLE_GCC=False
 ENABLE_BASH=False
 ENABLE_PYTHON=False
+ENABLE_JAVA=False
 
 def main():
     parser = optparse.OptionParser()
     parser.add_option('-f', '--file', dest='filename', help='input command file')
-    parser.add_option('-b', '--bitstream', dest='bitstream', help='input bitstream file')
+    parser.add_option('-b', '--bitstream', dest='bitstream', default=False,
+                      action="store_true", help='load bitstream')
     parser.add_option('-c', '--compile', dest='compile', default=False,
                       action="store_true", help='compile linux')
     parser.add_option('-j', '--java', dest='java', default=False,
                       action="store_true", help='compile java.')
     parser.add_option('-r', '--run', dest='run', default=False,
-                      action="store_true", help='compile linux')
+                      action="store_true", help='run simulation')
     parser.add_option('-d', '--disable_counters', dest='disable_counters', default=False,
                       action="store_true", help='Does not run rv_counters in target machine.')
     parser.add_option('-s', '--sim-flags', dest='sim_flags', default=False, help='simulation flags')
@@ -46,7 +62,6 @@ def main():
     if not options.filename:
         parser.error('Please give an input filename with -f')
     
-    fpga_bitstream = options.bitstream if options.bitstream else DEFAULT_FPGA_BITSTREAM
     sim_flags = options.sim_flags if options.sim_flags else DEFAULT_SIM_FLAGS
 
     f = open(options.filename)
@@ -77,9 +92,9 @@ def main():
         if options.compile:
           generate_init_file(cmd_str, initfile, options.java, options.disable_counters)
           generate_bblvmlinux(bmk_str, dir_str, initfile, options.java)
+        linux = os.path.join("/nscratch", "midas", "build", "bblvmlinux-" + bmk_str)
+        generate_qsub_file(bmk_str, cmd_str, sfile, OUTPUT_DIR, linux, sim_flags, options.bitstream)
         if options.run:
-          linux = os.path.join("/nscratch", "midas", "build", "bblvmlinux-" + bmk_str)
-          generate_qsub_file(bmk_str, cmd_str, sfile, OUTPUT_DIR, linux, fpga_bitstream, sim_flags)
           # now we can qsub on the file we just created
           print "run:", "sbatch", sfile
           subprocess.check_call(["sbatch", sfile])
@@ -120,6 +135,7 @@ def generate_init_file(cmd_str, initfile, java, disable_counters):
             f.write("ln -s python2 python\n")
             f.write("ln -s python2.7-config python2-config\n")
             f.write("ln -s python2-config python-config\n")
+ 
         # f.write("ls -ls /bin\n")
         # f.write("ls -ls /usr/bin\n")
         if not java:
@@ -161,7 +177,7 @@ def generate_bblvmlinux(bmk_str, dir_str, initfile, java):
     return linux
 
 #---------------------
-def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, fpga_bitstream, sim_flags):
+def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags, bitstream):
     with open(sfile, 'w') as f:
         # I can't get this to work with sh for some reason
         f.write("#!/bin/bash\n")
@@ -217,12 +233,13 @@ def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, fpga_bitstrea
         f.write("echo $FPGA_ID\n")
         f.write("echo \"FPGA IP:\"\n")
         f.write("echo $FPGA_IP\n")
-        #f.write("### Load the fpga bitfile\n")
-        #f.write("source /ecad/tools/xilinx/Vivado/2016.2/settings64.sh\n")
-        #f.write("which vivado\n")
-        #f.write("sleep 1\n")
-        #f.write("/nscratch/fpga-cluster/fpga-scripts/load-bitstream.sh " + fpga_bitstream + "\n")
-        #f.write("sleep 2\n")
+        if bitstream:
+          f.write("### Load the fpga bitfile\n")
+          f.write("source /ecad/tools/xilinx/Vivado/2016.2/settings64.sh\n")
+          f.write("which vivado\n")
+          f.write("sleep 1\n")
+          f.write("/nscratch/fpga-cluster/fpga-scripts/load-bitstream.sh " + FPGA_BITSTREAM + "\n")
+          f.write("sleep 2\n")
         
         f.write("### Copy the MIDAS driver\n")
         key = os.path.join("~", ".ssh", "id_rsa")
