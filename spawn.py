@@ -15,19 +15,36 @@ import python.cluster_scripts
 import python.target_software
 
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-TARGET="rocket"
-#TARGET="boom-2w"
+TARGET="rocket-l2"
+#TARGET="rocket-l2-80btbs"
+#TARGET="rocket-l2-160btbs"
+#TARGET="rocket-l2-320btbs"
+#TARGET="rocket-l2-480btbs"
+#TARGET="boom-2w-l2"
+#TARGET="boom-2w-tage-l2"
+#TARGET="boom-2w-gshare-l2-80btbs"
+#TARGET="boom-2w-gshare-l2-320btbs"
+#TARGET="boom-2w-gshare-l2-480btbs"
 BASE_DIR=os.path.join("/nscratch", getpass.getuser(), "boom-thesis", TARGET)
 BUILD_DIR=os.path.join(BASE_DIR, "script")
 OUTPUT_DIR=os.path.join(BASE_DIR, "output")
-DEFAULT_FPGA_BITSTREAM=os.path.join(BASE_DIR, "midas_wrapper.bit")
-LATENCY=1
-DEFAULT_SIM_FLAGS="+mm_LATENCY=%d" % (LATENCY)
+
+FPGA_BITSTREAM=os.path.join(BASE_DIR, "midas_wrapper.bit")
+L2_LATENCY=1
+MEM_LATENCY=80
+DEFAULT_SIM_FLAGS="\
++mm_MEM_LATENCY=%d \
++mm_L2_LATENCY=%d \
++mm_L2_WAY_BITS=2 \
++mm_L2_SET_BITS=12 \
++mm_L2_BLOCK_BITS=6" % (MEM_LATENCY, L2_LATENCY)
+
 EMAIL_ENABLED=True
 
 ENABLE_GCC=False
 ENABLE_BASH=False
 ENABLE_PYTHON=False
+ENABLE_JAVA=False
 
 parser = optparse.OptionParser()
 parser.add_option('-f', '--file', dest='filename', help='input command file')
@@ -82,4 +99,3 @@ for line in f:
       # now we can qsub on the file we just created
       print "run:", "sbatch", sfile
       subprocess.check_call(["sbatch", sfile])
-
