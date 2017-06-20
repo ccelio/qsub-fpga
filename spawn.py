@@ -47,8 +47,6 @@ ENABLE_JAVA=False
 def main():
     parser = optparse.OptionParser()
     parser.add_option('-f', '--file', dest='filename', help='input command file')
-    parser.add_option('-b', '--bitstream', dest='bitstream', default=False,
-                      action="store_true", help='load bitstream')
     parser.add_option('-c', '--compile', dest='compile', default=False,
                       action="store_true", help='compile linux')
     parser.add_option('-j', '--java', dest='java', default=False,
@@ -93,7 +91,7 @@ def main():
           generate_init_file(cmd_str, initfile, options.java, options.disable_counters)
           generate_bblvmlinux(bmk_str, dir_str, initfile, options.java)
         linux = os.path.join("/nscratch", "midas", "build", "bblvmlinux-" + bmk_str)
-        generate_qsub_file(bmk_str, cmd_str, sfile, OUTPUT_DIR, linux, sim_flags, options.bitstream)
+        generate_qsub_file(bmk_str, cmd_str, sfile, OUTPUT_DIR, linux, sim_flags)
         if options.run:
           # now we can qsub on the file we just created
           print "run:", "sbatch", sfile
@@ -177,7 +175,7 @@ def generate_bblvmlinux(bmk_str, dir_str, initfile, java):
     return linux
 
 #---------------------
-def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags, bitstream):
+def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags):
     with open(sfile, 'w') as f:
         # I can't get this to work with sh for some reason
         f.write("#!/bin/bash\n")
@@ -233,13 +231,33 @@ def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags, bi
         f.write("echo $FPGA_ID\n")
         f.write("echo \"FPGA IP:\"\n")
         f.write("echo $FPGA_IP\n")
-        if bitstream:
-          f.write("### Load the fpga bitfile\n")
-          f.write("source /ecad/tools/xilinx/Vivado/2016.2/settings64.sh\n")
-          f.write("which vivado\n")
-          f.write("sleep 1\n")
-          f.write("/nscratch/fpga-cluster/fpga-scripts/load-bitstream.sh " + FPGA_BITSTREAM + "\n")
-          f.write("sleep 2\n")
+        f.write("### Load the fpga bitfile\n")
+        f.write("source /ecad/tools/xilinx/Vivado/2016.2/settings64.sh\n")
+        f.write("which vivado\n")
+        # Reset the FPGA, in case it is in an unusable state
+        f.write("### Reset the FPGA in case it hung in an earlier run\n")
+        f.write("count=0\n")
+        f.write("/opt/apc-8/snmp-apc-set.sh $FPGA_ID 3\n")
+        f.write("while true; do\n")
+        f.write("    count=$[$count + 1]\n")
+        f.write("    if ping -c 1 $FPGA_IP &> /dev/null\n")
+        f.write("    then\n")
+        f.write("        break\n")
+        f.write("    fi\n")
+        f.write("    if [ $count -gt 30 ]\n")
+        f.write("    then\n")
+        f.write("        echo FPGA did not come out of reset.\n")
+        f.write("        exit 255\n")
+        f.write("    fi\n")
+        f.write("done\n\n")
+
+        # Execute FPGA programming as a critical section
+        f.write("### Program the FPGA\n")
+        f.write("(\n")
+        f.write("  flock -e 200\n")
+        f.write("  /nscratch/fpga-cluster/fpga-scripts/load-bitstream.sh " + FPGA_BITSTREAM + "\n")
+        f.write("  sleep 1\n")
+        f.write(") 200>/var/lock/.load-bitstream.sh.lock\n")
         
         f.write("### Copy the MIDAS driver\n")
         key = os.path.join("~", ".ssh", "id_rsa")
