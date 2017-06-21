@@ -14,7 +14,7 @@ import shutil
 from datetime import datetime
 
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-TARGET="rocket-l2"
+TARGET="default"
 #TARGET="rocket-l2-80btbs"
 #TARGET="rocket-l2-160btbs"
 #TARGET="rocket-l2-320btbs"
@@ -24,25 +24,20 @@ TARGET="rocket-l2"
 #TARGET="boom-2w-gshare-l2-80btbs"
 #TARGET="boom-2w-gshare-l2-320btbs"
 #TARGET="boom-2w-gshare-l2-480btbs"
-BASE_DIR=os.path.join("/nscratch", getpass.getuser(), "boom-thesis", TARGET)
+BASE_DIR=os.path.join("/nscratch", getpass.getuser(), "midas-top-sw-cleanup", TARGET)
 BUILD_DIR=os.path.join(BASE_DIR, "script")
 OUTPUT_DIR=os.path.join(BASE_DIR, "output")
 FPGA_BITSTREAM=os.path.join(BASE_DIR, "midas_wrapper.bit")
-L2_LATENCY=1
 MEM_LATENCY=80
-DEFAULT_SIM_FLAGS="\
-+mm_MEM_LATENCY=%d \
-+mm_L2_LATENCY=%d \
-+mm_L2_WAY_BITS=2 \
-+mm_L2_SET_BITS=12 \
-+mm_L2_BLOCK_BITS=6" % (MEM_LATENCY, L2_LATENCY)
+DEFAULT_SIM_FLAGS="+mm_readLatency=8 +mm_writeLatency=8 +mm_readMaxReqs=4 +mm_writeMaxReqs=4"
 
 EMAIL_ENABLED=True
-
 ENABLE_GCC=False
 ENABLE_BASH=False
 ENABLE_PYTHON=False
 ENABLE_JAVA=False
+
+HOST_FILES_TO_COPY=["memory_stats.csv"]
 
 def main():
     parser = optparse.OptionParser()
@@ -144,7 +139,7 @@ def generate_init_file(cmd_str, initfile, java, disable_counters):
         for cmd in cmd_str.split("\n"):
           f.write("echo " + cmd + "\n")
         if not disable_counters:
-          f.write("/celio/rv_counters/rv_counters &\n")
+          f.write("./rv_counters &\n")
           f.write("sleep 1\n")
         f.write(cmd_str + "\n")
         if not disable_counters:
@@ -158,18 +153,13 @@ def generate_init_file(cmd_str, initfile, java, disable_counters):
 def generate_bblvmlinux(bmk_str, dir_str, initfile, java):
     print "Generating bblvmlinux with: ", initfile
     shutil.copyfile(initfile, os.path.join(LINUX_SOURCE, "profile"))
-    shutil.copyfile(os.path.join(LINUX_SOURCE, "busybox_config_%s" % ("java" if java else "spec")),
-                    os.path.join(LINUX_SOURCE, "busybox_config"))
     subprocess.check_call(
       ["./build-initram.py", "--dir", "/nscratch/midas/initram/" + dir_str] + (
       ["--bmark", "java"] if java else []), cwd=LINUX_SOURCE)
     subprocess.check_call(
       ["make", "DIRNAME=" + dir_str] + (
       ["BUILD_JAVA=1"] if java else []), cwd=LINUX_SOURCE, shell=True)
-    target_dir = os.path.join("/nscratch", "midas", "build")
-    if not os.path.exists(target_dir):
-      os.makedirs(target_dir)
-    linux = os.path.join(target_dir, "bblvmlinux-" + bmk_str)
+    linux = os.path.join(BUILD_DIR, "bblvmlinux-" + bmk_str)
     shutil.copyfile(os.path.join(LINUX_SOURCE, "bblvmlinux"), linux)
 
     return linux
@@ -203,10 +193,10 @@ def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags):
         f.write("### Supress messages\n")
         f.write("#SBATCH -Q\n")
         print "Current directory(",os.getcwd(),")"
-        f.write("SLURMDIR=" + output_dir + "/\n")
+        f.write("SLURMDIR=" + output_dir + "/" + bmk_str + "\n")
         #f.write("JOBID=`echo $PBS_JOBID | sed -e 's/\..*//'`\n")
         f.write("mkdir -p $SLURMDIR\n")
-        f.write("exec > $SLURMDIR/" + bmk_str + ".out 2> $SLURMDIR/" + bmk_str +".err\n\n")
+        f.write("exec > $SLURMDIR/out 2> $SLURMDIR/err\n\n")
 
         ### Jobs should only be run from /scratch, /nscratch or /vlsi; Torque returns results via NFS.
         #f.write("echo Working directory is $PBS_O_WORKDIR\n")
@@ -272,9 +262,13 @@ def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags):
 
         f.write("### Log-in to the FPGA and run the benchmark\n")
         f.write("echo ['" + cmd_str.replace('\n','') + "']\n")
-        f.write("time ssh root@$FPGA_IP -i " + key + 
+        f.write("time ssh root@$FPGA_IP -i " + key +
           " -t \"ls; sync; uname -a; ls /sdcard/midas; cd /sdcard/midas; ./MidasTop-zynq " +
           ' '.join(sim_flags.split()) + " ./linux\"\n")
+
+        for fn in HOST_FILES_TO_COPY:
+          f.write("scp -i %s root@$FPGA_IP:/sdcard/midas/%s $SLURMDIR/%s" % (key, fn, fn))
+
 
 if __name__ == '__main__':
     main()
