@@ -14,16 +14,21 @@ import shutil
 from datetime import datetime
 
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-TARGET="rocket-l2"
+#TARGET="rocket-l2"
 #TARGET="rocket-l2-80btbs"
 #TARGET="rocket-l2-160btbs"
 #TARGET="rocket-l2-320btbs"
 #TARGET="rocket-l2-480btbs"
+#TARGET="rocket-32kb-l1"
 #TARGET="boom-2w-l2"
 #TARGET="boom-2w-tage-l2"
 #TARGET="boom-2w-gshare-l2-80btbs"
 #TARGET="boom-2w-gshare-l2-320btbs"
 #TARGET="boom-2w-gshare-l2-480btbs"
+#TARGET="boom-2w-32kb-l1"
+#TARGET="boom-2w-wideL1toL2"
+#TARGET="boom-2w-wideL1toL2-16k-l1"
+TARGET="strober-rocket"
 BASE_DIR=os.path.join("/nscratch", getpass.getuser(), "boom-thesis", TARGET)
 BUILD_DIR=os.path.join(BASE_DIR, "script")
 OUTPUT_DIR=os.path.join(BASE_DIR, "output")
@@ -90,7 +95,7 @@ def main():
         if options.compile:
           generate_init_file(cmd_str, initfile, options.java, options.disable_counters)
           generate_bblvmlinux(bmk_str, dir_str, initfile, options.java)
-        linux = os.path.join("/nscratch", "midas", "build", "bblvmlinux-" + bmk_str)
+        linux = os.path.join("/nscratch", "midas", "build-f1", "bblvmlinux-" + bmk_str)
         generate_qsub_file(bmk_str, cmd_str, sfile, OUTPUT_DIR, linux, sim_flags)
         if options.run:
           # now we can qsub on the file we just created
@@ -263,6 +268,8 @@ def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags):
         key = os.path.join("~", ".ssh", "id_rsa")
         f.write("scp -i %s %s root@$FPGA_IP:/sdcard/midas/MidasTop-zynq\n" % (
                 key, os.path.join(BASE_DIR, "MidasTop-zynq")))
+        f.write("scp -i %s %s root@$FPGA_IP:/sdcard/midas/MidasTop.chain\n" % (
+                key, os.path.join(BASE_DIR, "MidasTop.chain")))
         f.write("scp -i %s %s root@$FPGA_IP:/usr/local/lib/libfesvr.so\n" % (
                 key, os.path.join(BASE_DIR, "libfesvr.so")))
 
@@ -272,9 +279,14 @@ def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags):
 
         f.write("### Log-in to the FPGA and run the benchmark\n")
         f.write("echo ['" + cmd_str.replace('\n','') + "']\n")
+        sample_file = bmk_str + ".sample"
         f.write("time ssh root@$FPGA_IP -i " + key + 
           " -t \"ls; sync; uname -a; ls /sdcard/midas; cd /sdcard/midas; ./MidasTop-zynq " +
-          ' '.join(sim_flags.split()) + " ./linux\"\n")
+          ' '.join(sim_flags.split() + ["+sample=" + sample_file, "+samplenum=100"]) + " ./linux\"\n")
+
+        f.write("### Copy samples back\n")
+        f.write("scp -i %s root@$FPGA_IP:/sdcard/midas/%s %s\n" % (
+                key, sample_file, os.path.join(BASE_DIR, "output", sample_file)))
 
 if __name__ == '__main__':
     main()
