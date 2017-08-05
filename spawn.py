@@ -28,7 +28,8 @@ LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
 #TARGET="boom-2w-32kb-l1"
 #TARGET="boom-2w-wideL1toL2"
 #TARGET="boom-2w-wideL1toL2-16k-l1"
-TARGET="strober-rocket"
+#TARGET="strober-rocket"
+TARGET="strober-boom-2w"
 BASE_DIR=os.path.join("/nscratch", getpass.getuser(), "boom-thesis", TARGET)
 BUILD_DIR=os.path.join(BASE_DIR, "script")
 OUTPUT_DIR=os.path.join(BASE_DIR, "output")
@@ -37,10 +38,10 @@ L2_LATENCY=1
 MEM_LATENCY=80
 DEFAULT_SIM_FLAGS="\
 +mm_MEM_LATENCY=%d \
-+mm_L2_LATENCY=%d \
-+mm_L2_WAY_BITS=2 \
-+mm_L2_SET_BITS=12 \
-+mm_L2_BLOCK_BITS=6" % (MEM_LATENCY, L2_LATENCY)
++mm_LLC_LATENCY=%d \
++mm_LLC_WAY_BITS=2 \
++mm_LLC_SET_BITS=12 \
++mm_LLC_BLOCK_BITS=6" % (MEM_LATENCY, L2_LATENCY)
 
 EMAIL_ENABLED=True
 
@@ -282,7 +283,8 @@ def generate_qsub_file(bmk_str, cmd_str, sfile, output_dir, linux, sim_flags):
         sample_file = bmk_str + ".sample"
         f.write("time ssh root@$FPGA_IP -i " + key + 
           " -t \"ls; sync; uname -a; ls /sdcard/midas; cd /sdcard/midas; ./MidasTop-zynq " +
-          ' '.join(sim_flags.split() + ["+sample=" + sample_file, "+samplenum=100"]) + " ./linux\"\n")
+          ' '.join(sim_flags.split() + ["+sample=" + sample_file, "+samplenum=50", "+tracelen=256"]) +
+          " ./linux; rm -rf *.sample_*\"\n")
 
         f.write("### Copy samples back\n")
         f.write("scp -i %s root@$FPGA_IP:/sdcard/midas/%s %s\n" % (
