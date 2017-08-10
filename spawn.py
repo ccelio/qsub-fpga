@@ -14,7 +14,7 @@ import shutil
 from datetime import datetime
 
 LINUX_SOURCE=os.path.join("/scratch", getpass.getuser(), "initramfs_linux_flow")
-TARGET="rocket-l2"
+#TARGET="rocket-l2"
 #TARGET="rocket-l2-80btbs"
 #TARGET="rocket-l2-160btbs"
 #TARGET="rocket-l2-320btbs"
@@ -24,6 +24,7 @@ TARGET="rocket-l2"
 #TARGET="boom-2w-gshare-l2-80btbs"
 #TARGET="boom-2w-gshare-l2-320btbs"
 #TARGET="boom-2w-gshare-l2-480btbs"
+TARGET="boom-v2-new"
 BASE_DIR=os.path.join("/nscratch", getpass.getuser(), "boom-thesis", TARGET)
 BUILD_DIR=os.path.join(BASE_DIR, "script")
 OUTPUT_DIR=os.path.join(BASE_DIR, "output")
@@ -32,10 +33,10 @@ L2_LATENCY=1
 MEM_LATENCY=80
 DEFAULT_SIM_FLAGS="\
 +mm_MEM_LATENCY=%d \
-+mm_L2_LATENCY=%d \
-+mm_L2_WAY_BITS=2 \
-+mm_L2_SET_BITS=12 \
-+mm_L2_BLOCK_BITS=6" % (MEM_LATENCY, L2_LATENCY)
++mm_LLC_LATENCY=%d \
++mm_LLC_WAY_BITS=2 \
++mm_LLC_SET_BITS=12 \
++mm_LLC_BLOCK_BITS=6" % (MEM_LATENCY, L2_LATENCY)
 
 EMAIL_ENABLED=True
 
